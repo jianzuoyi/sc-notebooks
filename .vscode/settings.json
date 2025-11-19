@@ -36,7 +36,8 @@
     "cursorpyright.analysis.diagnosticMode": "workspace",
     "cursorpyright.analysis.inlayHints.functionReturnTypes": true,
     "cursorpyright.analysis.inlayHints.variableTypes": true,
-    "cursorpyright.analysis.typeCheckingMode": "basic"
+    "cursorpyright.analysis.typeCheckingMode": "basic",
+    "r.lsp.promptToInstall": false
 }
 
 
