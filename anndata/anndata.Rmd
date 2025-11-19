@@ -1,0 +1,229 @@
+---
+title: "AnnData"
+output: html_document
+date: "2025-01-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{python}
+import numpy as np
+import pandas as pd
+import anndata as ad
+from scipy.sparse import csr_matrix
+
+print(np.__version__)
+
+print(ad.__version__)
+
+```
+
+```{python}
+counts = csr_matrix(np.random.poisson(1, size=(100, 2000)), dtype=np.float32)
+counts
+adata = ad.AnnData(counts)
+adata.X
+adata.obs_names = [f"Cell_{i:d}" for i in range(adata.n_obs)]
+adata.var_names = [f"Gene_{i:d}" for i in range(adata.n_vars)]
+print(adata.obs_names[:10])
+
+x = adata[["Cell_1", 'Cell_10'], ["Gene_5", "Gene_1900"]]
+
+adata.__dict__
+ct = np.random.choice(["B", "T", "Monocyte"], size=(adata.n_obs,))
+
+adata.obs["cell_type"] = pd.Categorical(ct)  # Categoricals are preferred for efficiency
+
+adata[adata.obs.cell_type == "T"]
+
+adata.obsm["X_umap"] = np.random.normal(0, 1, size=(adata.n_obs, 2))
+adata.varm["gene_stuff"] = np.random.normal(0, 1, size=(adata.n_vars, 5))
+
+
+adata.uns["random"] = [1, 2, 3]
+
+
+
+adata.layers["log_transformed"] = np.log1p(adata.X)
+adata.layers["log_transformed"] 
+adata
+adata.X
+adata.to_df(layer="log_transformed")
+
+obs_meta = pd.DataFrame({
+        'time_yr': np.random.choice([0, 2, 4, 8], adata.n_obs),
+        'subject_id': np.random.choice(['subject 1', 'subject 2', 'subject 4', 'subject 8'], adata.n_obs),
+        'instrument_type': np.random.choice(['type a', 'type b'], adata.n_obs),
+        'site': np.random.choice(['site x', 'site y'], adata.n_obs),
+    },
+    index=adata.obs.index,    # these are the same IDs of observations as above!
+)
+adata = ad.AnnData(adata.X, obs=obs_meta, var=adata.var)
+adata
+
+adata[:5, ['Gene_1', 'Gene_3']]
+
+print(adata[:3, 'Gene_1'].X.toarray().tolist())
+adata[:3, 'Gene_1'].X = [0, 0, 0]
+print(adata[:3, 'Gene_1'].X.toarray().tolist())
+
+adata_subset = adata[:3, ['Gene_1', 'Gene_2']]
+adata_subset
+adata_subset.obs['foo'] = range(3)
+adata_subset
+
+```
+
+## scverse
+
+```{python}
+import anndata
+import matplotlib.pyplot as plt
+import numpy as np
+import pooch
+import scanpy as sc
+
+datapath = pooch.retrieve(
+    url="https://figshare.com/ndownloader/files/40067737",
+    known_hash="md5:b80deb0997f96b45d06f19c694e46243",
+    path="./data",
+    fname="scverse-getting-started-anndata-pbmc3k_processed.h5ad",
+)
+datapath
+adata = anndata.read_h5ad(datapath)
+adata
+adata.var_names
+adata.obsp['distances_all']
+```
+
+```{python}
+adata.X
+adata.var
+adata.obs
+adata.X.data
+```
+
+```{python}
+adata.X.indices
+```
+```{python}
+adata.X.nnz
+np.product(adata.X.shape)
+
+adata
+print(adata.X.nnz / np.product(adata.X.shape))
+adata.layers['raw'].data
+```
+```{python}
+adata.layers['raw']
+adata
+adata.obsm['X_pca']
+```
+
+```{python}
+adata.layers["counts_per_million"] = adata.layers["raw"].copy()
+adata
+sc.pp.normalize_total(adata, target_sum=10**6, layer="counts_per_million")
+adata
+adata.layers['raw'].data
+adata.layers['counts_per_million'].data
+
+adata.obs
+adata.var
+adata.obs_keys()
+adata.obs["louvain_cell_types"]
+
+adata.obs["louvain_cell_types"] == "B cells"
+adata.obs["is_low_quality"] = adata.obs["percent_mito"] > 0.03
+adata.obs
+
+
+for key in adata.obsm_keys():
+    print(key, adata.obsm[key].shape, sep="\t")
+
+adata.obsm
+adata.obsm['X_pca'].shape
+adata.obsm['X_tsne'].shape
+adata.obsm['X_umap'].shape
+
+adata.obsm['X_pca']
+adata.obsm['X_tsne']
+adata.obsm['X_umap']
+ 
+
+
+```
+
+```{python}
+plt.figure(figsize=(12, 4))
+
+# PCA
+plt.subplot(1, 3, 1)
+plt.scatter(
+    x=adata.obsm["X_pca"][:, 0],  # PCA dim 1
+    y=adata.obsm["X_pca"][:, 1],  # PCA dim 2
+    c=adata.obs["louvain_cell_types"] == "B cells",  # B cell flag
+    s=3,
+    linewidth=0,
+    cmap="coolwarm",
+)
+plt.title("PCA")
+plt.axis("off")
+plt.gca().set_aspect("equal")
+
+# t-SNE
+plt.subplot(1, 3, 2)
+plt.scatter(
+    x=adata.obsm["X_tsne"][:, 0],  # t-SNE dim 1
+    y=adata.obsm["X_tsne"][:, 1],  # t-SNE dim 2
+    c=adata.obs["louvain_cell_types"] == "B cells",  # B cell flag
+    s=3,
+    linewidth=0,
+    cmap="coolwarm",
+)
+plt.title("t-SNE")
+plt.axis("off")
+plt.gca().set_aspect("equal")
+
+# UMAP
+plt.subplot(1, 3, 3)
+plt.scatter(
+    x=adata.obsm["X_umap"][:, 0],  # UMAP dim 1
+    y=adata.obsm["X_umap"][:, 1],  # UMAP dim 2
+    c=adata.obs["louvain_cell_types"] == "B cells",  # B cell flag
+    s=3,
+    linewidth=0,
+    cmap="coolwarm",
+)
+plt.title("UMAP")
+plt.axis("off")
+plt.gca().set_aspect("equal")
+plt.show()
+```
+
+```{python}
+adata.obsp['distances_all'].shape
+adata.X
+
+adata_view = adata[:6, 5:10]
+adata_view
+adata_view.X.toarray()
+adata.X[0, 7] = 99
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
